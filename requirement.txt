@@ -1,0 +1,10 @@
+Cython==0.29.32
+matplotlib==3.1.2
+pandas==0.25.3
+Pillow==7.0.0
+pycairo==1.16.2
+pycrypto==2.6.1
+scipy==1.5.3
+simplejson==3.16.0
+tensorrt==8.4.1.5
+torch=1.12.1
