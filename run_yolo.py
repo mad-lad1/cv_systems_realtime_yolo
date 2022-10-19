@@ -4,7 +4,7 @@
     
     sample command to run the script
     
-    python run_yolo.py --show_image --video_path test.mp4
+    python run_yolo.py --show --video_path test.mp4
     
     Requires:
         - cvu
@@ -32,11 +32,21 @@ import json
 import time 
 
 
-Object_classes = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
-                          'traffic light',
-                          'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep',
-                          'cow',
-                          'elephant', 'bear', 'zebra', 'giraffe'] + 56 * ['UO']
+Object_classes = [
+    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
+    'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
+    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag',
+    'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite',
+    'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
+    'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon',
+    'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+    'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant',
+    'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
+    'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+    'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
+    'hair drier', 'toothbrush'
+]
 COLORS = np.random.uniform(0, 255, size=(len(Object_classes), 3))
 classes_to_colors = {Object_classes[i]: COLORS[i] for i in range(len(Object_classes))} 
 
@@ -80,8 +90,10 @@ def put_fps(image: np.ndarray, fps: float) -> None:
     """
     Puts the FPS on the image inplace.
     """
-    cv2.putText(image, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                1, (255, 255, 255), 2)
+    textsize = cv2.getTextSize(f"{fps:.2f} FPS", 0, fontScale=0.5, thickness=1)[0]
+    cv2.putText(image, f"{fps:.2f} FPS", (image.shape[1] - textsize[0] - 10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    
 
 
 
@@ -97,17 +109,18 @@ if __name__ == '__main__':
     parse.add_argument('--image_path', default='test.jpg', type=str)
     # video path
     parse.add_argument('--video_path', default='camera')
+    parse.add_argument('--show_fps', default=False, action='store_true')
     args = parse.parse_args()
     show_image = args.show
     video_path = args.video_path
-    
+    show_fps = args.show_fps
     if video_path == 'camera':
         video_path = 0
     
 
 
-    image_width = 224
-    image_height = 224
+    image_width = 256
+    image_height = 256
     
     
     
@@ -121,37 +134,47 @@ if __name__ == '__main__':
     
     # should take some time to compile. With tensorrt, it is much faster to load the model
     # and it takes less memory
-    model = yolort(auto_install=True, backend='tensorrt', weight="yolov5s", dtype='fp32', classes=Object_classes)
+    model = yolort(auto_install=True, backend='tensorrt', weight="yolov5s", dtype='fp32', classes='coco')
 
-    # used to record the time when we processed last frame
-    prev_frame_time = 0
- 
-    # used to record the time at which we processed current frame
-    new_frame_time = 0
-
-
+    start_time = time.time()
+    fc = 0
+    display_time = 2
+    fps = 0
+    
     try:
         if args.type == 'video':
             while cam_reader.isOpened():
                 
-                # get fps from cam_reader
-                fps = cam_reader.get(cv2.CAP_PROP_FPS)
+                
+                # fps = cam_reader.get(cv2.CAP_PROP_FPS)
+                
+                
                 
                 ret, img = cam_reader.read()
                 img = cv2.resize(img, (image_width, image_height))
+                fc += 1
+                TIME = time.time() - start_time
+                
+                if(TIME > display_time):
+                    fps = fc / TIME
+                    fc = 0
+                    start_time = time.time()
+                
                 if ret:
                     preds = model(img)
                     for pred in preds:
                         draw_bbox(img, pred.bbox, pred.class_name, thickness=1)
-                    
-            
-                    put_fps(img, fps)
+                    if show_fps:
+                        put_fps(img, float(fps))
+
+                    #put_fps(img, fps)
                     if show_image:
                         cv2.imshow("Image", img)
                         ch=cv2.waitKey(1)
                         if ch ==27 or ch==ord('q') or ch==ord('Q'):
                             cv2.destroyAllWindows()
                             break
+                
                     
         elif args.type == 'image':
             #img = cv2.resize(img, (image_width, image_height))
